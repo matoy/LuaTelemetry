@@ -665,7 +665,7 @@ local function run(event)
 			lcd.drawLine(i, 2, i, 5, SOLID, FORCE)
 		end
 	end
-	if (not SMLCD and bit32.band(config[17].v, 1) ~= 1) or (SMLCD and config[19].v == 0) then
+	if (not SMLCD and bit32.band(config[17].v, 1) ~= 1) or (SMLCD and config[17].v == 0) then
 		lcd.drawNumber(SMLCD and 90 or 110 , 1, data.txBatt * 10.01, SMLSIZE + PREC1 + INVERS)
 		lcd.drawText(lcd.getLastPos(), 1, "V", SMLSIZE + INVERS)
 	end
