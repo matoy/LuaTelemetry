@@ -2,7 +2,7 @@
 -- Author: https://github.com/teckel12
 -- Docs: https://github.com/iNavFlight/LuaTelemetry
 
-local VERSION = "1.3.1"
+local VERSION = "1.3.1-th"
 local FILE_PATH = "/SCRIPTS/TELEMETRY/iNav/"
 local FLASH = 3
 local lcd = LCD or lcd
@@ -101,7 +101,7 @@ local data = {
 	altHold = false,
 	telemFlags = -1,
 	cells = -1,
-	fuel = 100,
+	fuel = 0,
 	config = 0,
 	modeId = 1,
 	startup = 1
@@ -132,7 +132,7 @@ local function reset()
 	if not data.showCurr then
 		data.cells = -1
 	end
-	data.fuel = 100
+	data.fuel = 0
 	data.config = 0
 	data.gpsAltBase = false
 end
@@ -155,13 +155,11 @@ local config = {
 	{ o = 7,  t = "Altitude Alert", c = 1, v = 1, i = 1, l = {[0] = "Off", "On"} },
 	{ o = 9,  t = "Timer",          c = 1, v = 1, x = 4, i = 1, l = {[0] = "Off", "Auto", "Timer1", "Timer2", "Timer3"} },
 	{ o = 11, t = "Rx Voltage",     c = 1, v = 1, i = 1, l = {[0] = "Off", "On"} },
-	{ o = 19, t = "GPS",            c = 1, v = 4, x = 4, i = 1, l = {[0] = emptyGPS, emptyGPS, emptyGPS, emptyGPS, emptyGPS} },
-	{ o = 18, t = "GPS Coords",     c = 1, v = 0, x = 2, i = 1, l = {[0] = "Decimal", "Deg/Min", "Geocode"} },
-	{ o = 6,  t = "Fuel Critical",  c = 2, v = 20, m = 5, x = 30, i = 5, a = "%", b = 2 },
-	{ o = 5,  t = "Fuel Low",       c = 2, v = 30, m = 10, x = 50, i = 5, a = "%", b = 2 },
+	{ o = 5, t = "GPS",            c = 1, v = 4, x = 4, i = 1, l = {[0] = emptyGPS, emptyGPS, emptyGPS, emptyGPS, emptyGPS} },
+	{ o = 6, t = "GPS Coords",     c = 1, v = 0, x = 2, i = 1, l = {[0] = "Decimal", "Deg/Min", "Geocode"} },
 	{ o = 10, t = "Tx Voltage",     c = 1, v = 2, x = 2, i = 1, l = {[0] = "Decimal", "Graph", "On"} }
 }
-local configValues = 19
+local configValues = 17
 for i = 1, configValues do
 	for ii = 1, configValues do
 		if i == config[ii].o then
@@ -323,29 +321,9 @@ local function flightModes()
 				beep = true
 			end
 		end
-		if data.battPercentPlayed > data.fuel and config[11].v == 2 and config[4].v == 2 then -- Fuel notification
-			if data.fuel % 5 == 0 and data.fuel > config[17].v and data.fuel <= config[18].v then
-				playAudio("batlow")
-				playNumber(data.fuel, 13)
-				data.battPercentPlayed = data.fuel
-			elseif data.fuel % 10 == 0 and data.fuel < 100 and data.fuel > config[17].v + 10 then
-				playAudio("battry")
-				playNumber(data.fuel, 13)
-				data.battPercentPlayed = data.fuel
-			end
-		end
-		if (data.fuel <= config[17].v or data.cell < config[3].v) and config[11].v > 0 then -- Voltage/fuel critial
-			if getTime() > data.battNextPlay then
-				playAudio("batcrt", 1)
-				if data.fuel <= config[17].v and data.battPercentPlayed > data.fuel and config[4].v > 0 then
-					playNumber(data.fuel, 13)
-					data.battPercentPlayed = data.fuel
-				end
-				data.battNextPlay = getTime() + 500
-			else
-				vibrate = true
-				beep = true
-			end
+		if (data.cell < config[3].v) and config[11].v > 0 then -- Voltage critial
+			vibrate = true
+			beep = true
 			data.battLow = true
 		elseif data.cell < config[2].v and config[11].v == 2 then -- Voltage notification
 			if not data.battLow then
@@ -418,7 +396,7 @@ local function background()
 		data.speedMax = getValue(data.speedMax_id)
 		data.batt = getValue(data.batt_id)
 		data.battMin = getValue(data.battMin_id)
-		if (data.cells == -1 and data.batt > 2) or (data.showCurr and data.fuel >= 95) then
+		if (data.cells == -1 and data.batt > 2) then
 			data.cells = math.floor(data.batt / 4.3) + 1
 		end
 		data.cell = data.batt/data.cells
@@ -627,18 +605,14 @@ local function run(event)
 		lcd.drawFilledRectangle(tmp, 11, 5, 4, FORCE)
 		lcd.drawPoint(tmp + 2, 12)
 	end
-	tmp = (data.telemFlags > 0 or data.fuel <= config[17].v or data.cell < config[3].v) and FLASH or 0
+	tmp = (data.telemFlags > 0 or data.cell < config[3].v) and FLASH or 0
 	drawData("Dist", data.distPos, 1, data.distanceLast, data.distanceMax, 10000, units[data.distance_unit], 0, data.telemFlags)
 	drawData(units[data.speed_unit], data.speedPos, 1, data.speed, data.speedMax, 1000, '', 0, data.telemFlags)
 	drawData("Batt", data.battPos1, 2, config[1].v == 0 and data.cell * 10 or data.batt, config[1].v == 0 and (data.battMin * 10 / data.cells) or data.battMin, 100, "V", config[1].v == 0 and PREC2 or PREC1, tmp, 1)
 	drawData("RSSI", 57, 2, data.rssiLast, data.rssiMin, 200, "dB", 0, (data.telemFlags > 0 or data.rssi < data.rssiLow) and FLASH or 0)
 	if data.showCurr then
 		drawData("Curr", 33, 1, data.current, data.currentMax, 100, "A", PREC1, data.telemFlags)
-		drawData("Fuel", 41, 0, data.fuel, 0, 200, "%", 0, tmp)
-		lcd.drawGauge(46, 41, GAUGE_WIDTH, 7, math.min(data.fuel, 98), 100)
-		if data.fuel == 0 then
-			lcd.drawLine(47, 42, 47, 46, SOLID, ERASE)
-		end
+		drawData("Fuel", 41, 0, data.fuel, 0, 100000, "mAh", 0, data.telemFlags)
 	end
 	tmp = 100 / (4.2 - config[3].v + 0.1)
 	lcd.drawGauge(46, data.battPos2, GAUGE_WIDTH, 56 - data.battPos2, math.min(math.max(data.cell - config[3].v + 0.1, 0) * tmp, 98), 100)
@@ -683,7 +657,7 @@ local function run(event)
 	if config[13].v > 0 then
 		lcd.drawTimer(SMLCD and 60 or 150, 1, data.timer, SMLSIZE + INVERS)
 	end
-	if config[19].v > 0 then
+	if config[17].v > 0 then
 		lcd.drawFilledRectangle(86, 1, 19, 6, ERASE)
 		lcd.drawLine(105, 2, 105, 5, SOLID, ERASE)
 		tmp = math.max(math.min((data.txBatt - data.txBattMin) / (data.txBattMax - data.txBattMin) * 17, 17), 0) + 86
@@ -691,7 +665,7 @@ local function run(event)
 			lcd.drawLine(i, 2, i, 5, SOLID, FORCE)
 		end
 	end
-	if (not SMLCD and bit32.band(config[19].v, 1) ~= 1) or (SMLCD and config[19].v == 0) then
+	if (not SMLCD and bit32.band(config[17].v, 1) ~= 1) or (SMLCD and config[19].v == 0) then
 		lcd.drawNumber(SMLCD and 90 or 110 , 1, data.txBatt * 10.01, SMLSIZE + PREC1 + INVERS)
 		lcd.drawText(lcd.getLastPos(), 1, "V", SMLSIZE + INVERS)
 	end
@@ -779,10 +753,6 @@ local function run(event)
 					config[2].v = math.max(config[2].v, config[3].v + 0.1)
 				elseif z == 3 then -- Cell critical < low
 					config[3].v = math.min(config[3].v, config[2].v - 0.1)
-				elseif z == 18 then -- Fuel low > critical
-					config[18].v = math.max(config[18].v, config[17].v + 5)
-				elseif z == 17 then -- Fuel critical < low
-					config[17].v = math.min(config[17].v, config[18].v - 5)
 				elseif config[z].i > 1 then
 					config[z].v = math.floor(config[z].v / config[z].i) * config[z].i
 				end
